@@ -1,0 +1,432 @@
+
+<!DOCTYPE html>
+<html ng-app="tceClassroomApp">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TCE Classroom Availability Checker | Thiagarajar College of Engineering</title>
+    
+    <!-- AngularJS 1.8.2 CDN -->
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+    
+    <!-- Font Awesome CDN for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- External Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body ng-controller="ClassroomController">
+
+    <!-- HEADER / NAVIGATION -->
+    <header>
+        <div class="header-container">
+            <a href="#" class="brand-logo">
+                <div class="logo-badge">TCE</div>
+                <div class="brand-text">
+                    <h1>Thiagarajar College of Engineering</h1>
+                    <p>MADURAI - 625 015 (An Autonomous Institution)</p>
+                </div>
+            </a>
+            <nav style="display: flex; align-items: center; gap: 1rem;">
+                <ul style="display: flex; list-style: none; gap: 1rem; align-items: center;">
+                    <li><a href="#" class="active"><i class="fa-solid fa-gauge"></i> Dashboard</a></li>
+                    <li><a href="#classrooms"><i class="fa-solid fa-door-open"></i> Classrooms</a></li>
+                    <li><a href="#quick-avail"><i class="fa-solid fa-bolt"></i> Available Now</a></li>
+                </ul>
+
+                <!-- AUTHENTICATION STATUS / BUTTON -->
+                <div class="auth-nav-box" style="margin-left: 10px; border-left: 1px solid rgba(255,255,255,0.2); padding-left: 1rem;">
+                    <div ng-if="!currentUser">
+                        <button class="btn btn-primary" style="padding: 0.4rem 0.9rem; font-size: 0.8rem;" ng-click="openAuthModal('login')">
+                            <i class="fa-solid fa-right-to-bracket"></i> Login / Register
+                        </button>
+                    </div>
+                    <div ng-if="currentUser" style="display: flex; align-items: center; gap: 10px;">
+                        <div style="text-align: right;">
+                            <div style="font-size: 0.8rem; font-weight: 700; color: #fff;">{{ currentUser.name }}</div>
+                            <span style="font-size: 0.65rem; background: var(--accent-gold); color: #000; padding: 1px 6px; border-radius: 4px; font-weight: 700;">
+                                {{ currentUser.roleText }}
+                            </span>
+                        </div>
+                        <button class="btn btn-outline" style="color: white; border-color: rgba(255,255,255,0.3); padding: 0.3rem 0.6rem; font-size: 0.75rem;" ng-click="logout()">
+                            <i class="fa-solid fa-power-off"></i>
+                        </button>
+                    </div>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT CONTAINER -->
+    <div class="main-container">
+
+        <!-- HERO BANNER -->
+        <section class="hero-banner">
+            <h2>Find an Available Classroom</h2>
+            <p>Check real-time classroom availability across Thiagarajar College of Engineering. 
+               <span ng-if="!currentUser" style="display:block; margin-top:0.3rem; font-size:0.85rem; color:#FEF08A;">
+                   <i class="fa-solid fa-circle-info"></i> Note: Regular student viewing is open. <strong>Staffs & Student Reps</strong> please log in to book rooms.
+               </span>
+               <span ng-if="currentUser && currentUser.role !== 'student_view'" style="display:block; margin-top:0.3rem; font-size:0.85rem; color:#A7F3D0;">
+                   <i class="fa-solid fa-circle-check"></i> Logged in with booking privileges. You can reserve available rooms!
+               </span>
+            </p>
+            
+            <div class="hero-meta">
+                <div class="time-select-box">
+                    <i class="fa-regular fa-clock"></i>
+                    <label style="font-size:0.8rem; font-weight:500;">Demo Time Slot:</label>
+                    <select ng-model="selectedTimeSlot" ng-change="onTimeSlotChange()">
+                        <option ng-repeat="slot in timeSlots" value="{{slot}}">{{slot}}</option>
+                    </select>
+                </div>
+                <span style="font-size:0.85rem; opacity: 0.9;">
+                    <i class="fa-regular fa-calendar"></i> Today: September 30, 2026
+                </span>
+            </div>
+        </section>
+
+        <!-- DASHBOARD STATISTICS -->
+        <section class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-info">
+                    <h4>Total Classrooms</h4>
+                    <div>{{ getTotalClassrooms() }}</div>
+                </div>
+                <div class="stat-icon icon-blue">
+                    <i class="fa-solid fa-building"></i>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-info">
+                    <h4>Available Now</h4>
+                    <div>{{ getAvailableCount() }}</div>
+                </div>
+                <div class="stat-icon icon-green">
+                    <i class="fa-solid fa-door-open"></i>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-info">
+                    <h4>Currently Occupied</h4>
+                    <div>{{ getOccupiedCount() }}</div>
+                </div>
+                <div class="stat-icon icon-red">
+                    <i class="fa-solid fa-user-graduate"></i>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-info">
+                    <h4>Total Capacity</h4>
+                    <div>{{ getTotalCapacity() }}</div>
+                </div>
+                <div class="stat-icon icon-gold">
+                    <i class="fa-solid fa-users"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- SEARCH AND FILTERS -->
+        <section class="filter-card">
+            <div class="filter-grid">
+                <div class="filter-group">
+                    <label><i class="fa-solid fa-magnifying-glass"></i> Search Room</label>
+                    <input type="text" class="filter-control" placeholder="Search (e.g. IG1, IF3, B5)..." ng-model="searchQuery">
+                </div>
+
+                <div class="filter-group">
+                    <label><i class="fa-solid fa-landmark"></i> Building / Dept</label>
+                    <select class="filter-control" ng-model="filterDept">
+                        <option value="All">All Departments</option>
+                        <option value="IT Department">IT Department</option>
+                        <option value="B Halls">B Halls</option>
+                        <option value="Mechanical">Mechanical</option>
+                        <option value="A Halls">A Halls</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label><i class="fa-solid fa-layer-group"></i> Floor</label>
+                    <select class="filter-control" ng-model="filterFloor">
+                        <option value="All">All Floors</option>
+                        <option value="Ground Floor">Ground Floor</option>
+                        <option value="First Floor">First Floor</option>
+                        <option value="Second Floor">Second Floor</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label><i class="fa-solid fa-circle-info"></i> Availability Status</label>
+                    <select class="filter-control" ng-model="filterStatus">
+                        <option value="All">All Status</option>
+                        <option value="Available">Available Only</option>
+                        <option value="Occupied">Occupied Only</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label><i class="fa-solid fa-chair"></i> Min Capacity</label>
+                    <select class="filter-control" ng-model="filterCapacity">
+                        <option value="0">Any Capacity</option>
+                        <option value="30">30+ Seats</option>
+                        <option value="50">50+ Seats</option>
+                        <option value="75">75+ Seats</option>
+                        <option value="100">100+ Seats</option>
+                    </select>
+                </div>
+
+                <div class="filter-group filter-actions">
+                    <button class="btn btn-outline" style="width: 100%;" ng-click="clearFilters()">
+                        <i class="fa-solid fa-rotate-right"></i> Clear Filters
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- QUICK AVAILABILITY STRIP -->
+        <section id="quick-avail" class="quick-avail-container">
+            <div class="section-header" style="margin-bottom: 0.75rem;">
+                <div class="section-title" style="font-size: 1.1rem; color: #0369A1;">
+                    <i class="fa-solid fa-bolt"></i> Available Right Now ({{ selectedTimeSlot }})
+                </div>
+            </div>
+            <div class="quick-scroll">
+                <div class="quick-card" ng-repeat="room in classrooms | availabilityFilter:'Available' | limitTo: 10">
+                    <div class="quick-card-head">
+                        <span class="quick-room">{{ room.name | capitalizeRoom }}</span>
+                        <span class="status-badge badge-available">FREE</span>
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--light-text); margin-bottom: 0.5rem;">
+                        {{ room.department }} • {{ room.floor }}
+                    </div>
+                    <button class="btn btn-success" style="width:100%; font-size: 0.75rem; padding: 0.3rem;" ng-click="selectRoom(room)">
+                        Quick Book / Select
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- CLASSROOM CARDS SECTION -->
+        <section id="classrooms">
+            <div class="cards-header">
+                <div class="section-title">
+                    <i class="fa-solid fa-list-check"></i> All Classrooms Directory
+                </div>
+                <div class="results-count">
+                    Showing {{ filteredRooms.length }} of {{ classrooms.length }} classrooms
+                </div>
+            </div>
+
+            <div class="classroom-grid">
+                <div class="room-card" 
+                     ng-class="{'status-available': room.status === 'Available', 'status-occupied': room.status === 'Occupied'}"
+                     ng-repeat="room in filteredRooms = (classrooms | filter:searchQuery | availabilityFilter:filterStatus) | filter:customFilters">
+                    
+                    <div class="card-body">
+                        <div class="card-top">
+                            <div class="room-title-box">
+                                <h3>{{ room.name | capitalizeRoom }}</h3>
+                                <div class="room-dept">{{ room.department }}</div>
+                            </div>
+                            <span class="status-badge" ng-class="{'badge-available': room.status === 'Available', 'badge-occupied': room.status === 'Occupied'}">
+                                {{ room.status }}
+                            </span>
+                        </div>
+
+                        <div class="meta-list">
+                            <div class="meta-item">
+                                <i class="fa-solid fa-layer-group"></i>
+                                <span>Floor: <strong>{{ room.floor }}</strong></span>
+                            </div>
+                            <div class="meta-item">
+                                <i class="fa-solid fa-users"></i>
+                                <span>Capacity: <strong>{{ room.capacity }} Seats</strong></span>
+                            </div>
+                            <div class="meta-item" ng-if="room.status === 'Occupied'">
+                                <i class="fa-solid fa-book-open"></i>
+                                <span>Subject: <strong>{{ room.currentSubject }}</strong></span>
+                            </div>
+                            <div class="meta-item">
+                                <i class="fa-regular fa-clock"></i>
+                                <span>Next Available: <strong>{{ room.nextAvailable }}</strong></span>
+                            </div>
+                        </div>
+
+                        <div class="features-tags">
+                            <span class="tag" ng-repeat="feat in room.features">{{ feat }}</span>
+                        </div>
+                    </div>
+
+                    <div class="card-footer">
+                        <button class="btn btn-outline" ng-click="openDetails(room)">
+                            <i class="fa-solid fa-circle-info"></i> Details
+                        </button>
+                        <button class="btn btn-success" ng-if="room.status === 'Available'" ng-click="selectRoom(room)">
+                            <i class="fa-solid fa-check"></i> Book / Reserve
+                        </button>
+                    </div>
+                </div>
+
+                <div class="no-results" ng-if="filteredRooms.length === 0">
+                    <i class="fa-solid fa-building-circle-exclamation"></i>
+                    <h3>No Classrooms Found</h3>
+                    <p style="color: var(--light-text); margin-top: 0.5rem;">Try adjusting your filter settings or search term.</p>
+                    <button class="btn btn-primary" style="margin-top: 1rem;" ng-click="clearFilters()">Reset All Filters</button>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- DETAIL MODAL DIALOG -->
+    <div class="modal-backdrop" ng-if="activeModal" ng-click="closeModal()">
+        <div class="modal-card" ng-click="$event.stopPropagation()">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-building"></i> Classroom Details: {{ selectedRoom.name | capitalizeRoom }}</h3>
+                <button class="close-btn" ng-click="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="detail-row">
+                    <span class="detail-label">Classroom Name</span>
+                    <span class="detail-value">{{ selectedRoom.name | capitalizeRoom }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Department / Section</span>
+                    <span class="detail-value">{{ selectedRoom.department }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Floor Location</span>
+                    <span class="detail-value">{{ selectedRoom.floor }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Seating Capacity</span>
+                    <span class="detail-value">{{ selectedRoom.capacity }} Students</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Current Status</span>
+                    <span class="detail-value" ng-style="{'color': selectedRoom.status === 'Available' ? '#10B981' : '#EF4444'}">
+                        {{ selectedRoom.status }}
+                    </span>
+                </div>
+                <div class="detail-row" ng-if="selectedRoom.status === 'Occupied'">
+                    <span class="detail-label">Current Ongoing Class</span>
+                    <span class="detail-value">{{ selectedRoom.currentSubject }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Selected Time Slot</span>
+                    <span class="detail-value">{{ selectedRoom.currentTimeSlot }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Next Available Slot</span>
+                    <span class="detail-value">{{ selectedRoom.nextAvailable }}</span>
+                </div>
+                <div style="margin-top: 1rem;">
+                    <span class="detail-label" style="display:block; margin-bottom:0.4rem;">Room Amenities & Infrastructure</span>
+                    <div class="features-tags">
+                        <span class="tag" style="background:#E2E8F0;" ng-repeat="feat in selectedRoom.features">{{ feat }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" ng-click="closeModal()">Close</button>
+                <button class="btn btn-success" ng-if="selectedRoom.status === 'Available'" ng-click="selectRoom(selectedRoom); closeModal();">
+                    Confirm Booking / Reserve
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AUTHENTICATION MODAL (LOGIN / REGISTER) -->
+    <div class="modal-backdrop" ng-if="authModalOpen" ng-click="closeAuthModal()">
+        <div class="modal-card auth-modal-box" ng-click="$event.stopPropagation()">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-lock"></i> {{ authMode === 'login' ? 'TCE Portal Login' : 'Register New Account' }}</h3>
+                <button class="close-btn" ng-click="closeAuthModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                
+                <!-- Tab switchers -->
+                <div class="auth-tabs">
+                    <button class="auth-tab-btn" ng-class="{'active': authMode === 'login'}" ng-click="authMode = 'login'">Login</button>
+                    <button class="auth-tab-btn" ng-class="{'active': authMode === 'register'}" ng-click="authMode = 'register'">Register</button>
+                </div>
+
+                <!-- LOGIN FORM -->
+                <form name="loginForm" ng-submit="handleLogin()" ng-if="authMode === 'login'">
+                    <div class="filter-group" style="margin-bottom: 1rem;">
+                        <label>Email / User ID</label>
+                        <input type="text" class="filter-control" ng-model="loginData.email" placeholder="e.g. staff@tce.edu or rep@tce.edu" required>
+                    </div>
+                    <div class="filter-group" style="margin-bottom: 1.25rem;">
+                        <label>Password</label>
+                        <input type="password" class="filter-control" ng-model="loginData.password" placeholder="Enter password" required>
+                    </div>
+                    <div style="background: #F8FAFC; padding: 0.75rem; border-radius: 6px; font-size: 0.78rem; color: var(--light-text); margin-bottom: 1rem; border: 1px solid var(--border-color);">
+                        💡 <strong>Quick Demo Credentials:</strong><br>
+                        • Staff: <code>staff@tce.edu</code> / <code>123456</code><br>
+                        • Student Rep: <code>rep@tce.edu</code> / <code>123456</code><br>
+                        • Regular Student: <code>student@tce.edu</code> / <code>123456</code>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Login to Portal</button>
+                </form>
+
+                <!-- REGISTER FORM -->
+                <form name="registerForm" ng-submit="handleRegister()" ng-if="authMode === 'register'">
+                    <div class="filter-group" style="margin-bottom: 0.8rem;">
+                        <label>Full Name</label>
+                        <input type="text" class="filter-control" ng-model="regData.name" placeholder="Your Name" required>
+                    </div>
+                    <div class="filter-group" style="margin-bottom: 0.8rem;">
+                        <label>Email Address</label>
+                        <input type="email" class="filter-control" ng-model="regData.email" placeholder="yourname@tce.edu" required>
+                    </div>
+                    <div class="filter-group" style="margin-bottom: 0.8rem;">
+                        <label>Password</label>
+                        <input type="password" class="filter-control" ng-model="regData.password" placeholder="Create password" required>
+                    </div>
+                    <div class="filter-group" style="margin-bottom: 1.25rem;">
+                        <label>Select Role</label>
+                        <select class="filter-control" ng-model="regData.role" required>
+                            <option value="staff">Faculty / Staff (Can Book)</option>
+                            <option value="student_rep">Student Representative (Can Book)</option>
+                            <option value="student_view">Regular Student (View Only)</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-success" style="width: 100%;">Create Account</button>
+                </form>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div class="toast-notification" ng-if="toastMessage">
+        <i class="fa-solid fa-circle-check" style="color: #10B981;"></i>
+        <span>{{ toastMessage }}</span>
+    </div>
+
+    <!-- FOOTER -->
+    <footer>
+        <div class="footer-content">
+            <div>
+                <div class="footer-brand">Thiagarajar College of Engineering, Madurai</div>
+                <div style="font-size: 0.8rem; margin-top: 0.2rem;">Department of Information Technology & Institutional Resources</div>
+            </div>
+            <div style="font-size: 0.85rem;">
+                TCE Classroom Availability Checker &copy; 2026 TCE. All rights reserved.
+            </div>
+        </div>
+    </footer>
+
+    <!-- AngularJS Script -->
+    <script src="app.js"></script>
+</body>
+</html>
+index.html
+Displaying index.html.
